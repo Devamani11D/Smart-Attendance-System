@@ -1,0 +1,330 @@
+function sendTwilioSMS(accountSid, authToken, fromnum, to, body) {
+
+  var libraryIdentifier = '1Hy9vzm8vD9zIX6_h60gzkOzqHcTr68Oy_ou0tqtNnlF6uGfN6wN1oRSBb';
+  // Include the library by calling its functions or classes
+  var Twilio=libraryIdentifier;
+
+  var twilioUrl = 'https://api.twilio.com/2010-04-01/Accounts/' + accountSid + '/Messages.json';
+  var payload = {
+      'To': to,
+      'From': fromnum,
+      'Body': body,
+    };
+
+  // Send the SMS using the Twilio API
+  var headers = {
+    'Authorization': 'Basic ' + Utilities.base64Encode(accountSid + ':' + authToken),
+  };
+  var options = {
+      'method': 'post',
+      'headers': headers,
+      'payload': payload,
+    };
+
+  var response = UrlFetchApp.fetch(twilioUrl, options);
+
+  // Log the response
+  Logger.log(response.getContentText());
+  return;
+}
+
+function calculateStudentAttendance() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  var students = {};
+  
+  var accountSid = 'ACc54044932a2238363dc127c82de438f5';
+  var authToken = '0e9f60027e205aea7ee4d310352e0562';
+  var twilioNumber = '+15598274232';
+
+  // Loop through the data and calculate attendance for each student
+  for (var i = 50; i < data.length; i++) {
+    var studentName = data[i][2]; // Assuming student name is in column D
+    var status = data[i][5]; // Assuming in/out status is in column F
+    if (status == "IN") {
+      if (!students[studentName]) {
+        students[studentName] = { entered: 0, left: 0 };
+        students[studentName].phonenum=data[i][4];
+      }
+      students[studentName].entered++;
+    }
+    else if (status == "OUT") {
+      if (!students[studentName]) {
+        students[studentName] = { entered: 0, left: 0 };
+      }
+      students[studentName].left++;
+    }
+  }
+
+  var max=0;
+  for (var student in students) {
+    if(max < students[student].entered)
+    var max = students[student].entered;
+  }
+  var message;
+  // Calculate the attendance percentage for each student
+  for (var student in students) {
+    var attendance = (students[student].entered / max) * 100;
+    students[student].attendance = attendance;
+    var phoneNumber = students[student].phonenum;// Subtract 1 for zero-based index
+    message = "Hello student, Your attendance percentage is" + attendance+"%";
+
+  }
+
+  sendTwilioSMS(accountSid, authToken, twilioNumber,"+91 7569119615", message);
+  return students;
+}
+
+
+function doGet(e) {
+  if (Object.keys(e.parameters).length === 0) {
+    var students = calculateStudentAttendance();
+    var response = JSON.stringify(students);
+    return ContentService.createTextOutput(response).setMimeType(ContentService.MimeType.JSON);
+  } else {
+    return ContentService.createTextOutput("Invalid request. Please do not provide any parameters.");
+  }
+}
+
+function formatDateString(originalDateString) {
+  // var originalDateString = "Mon Oct 16 2023 00:19:51 GMT+0530 (India Standard Time)";
+  var originalDate = new Date(originalDateString);
+
+  var year = originalDate.getFullYear();
+  var month = ('0' + (originalDate.getMonth() + 1)).slice(-2);    // Months are 0-based, so add 1 and pad with '0'.
+  var day = ('0' + originalDate.getDate()).slice(-2);             // Pad the day with '0'.
+
+  var formattedDate = year + '/' + month + '/' + day;
+
+  return formattedDate;
+}
+
+function getLastEmptyRowWithinFirst50(sheet) {
+  var columnA = sheet.getRange("A1:A50").getValues();  // Check the values of column A
+  for (var i = 0; i < columnA.length; i++) {
+    if (!columnA[i][0]) {  // If the cell is empty
+      return i + 1;  // Google Sheet rows are 1-indexed
+    }
+  }
+  return 50;  // If no empty cells found, return 50
+}
+
+
+function findFirstEmptyRowAfter50(sheet) {
+  var values = sheet.getRange("A51:A200").getValues();
+  for (var i = 0; i < values.length; i++) {
+    if (values[i][0] === "") {
+      return 50 + i + 1;
+    }
+  }
+  // If no empty row is found, return the next row number after the 50th row
+  return 51 + values.length;
+}
+
+
+function doGet(e) {
+  // var e="https://script.google.com/macros/s/AKfycbyOH8BdPdOsmx7IGmdFYG31-rOrQT8Ap343OrYdKJwNaIL0af097oQ9GwYwHkwpmvHW/exec?id=2&name=devmani";   testing purpose
+  var isparams=e.parameter;
+  var jsonData;
+  var result=[];
+  var data = [];
+  var count=0;
+  var status='IN';
+  Logger.log(JSON.stringify(e)); //doubt
+  var value1;
+  var result;                                                                                                                              
+  if(isparams == 'undefined'){
+    result='No parameters';
+    return;
+  }
+ 
+  else{
+    var sheetid='1YE1unm1TGdwUhRa4_y-fEZBR049E-d1viyUV9T1vhHI'; //after /d/ in search bar link
+    var sheet=SpreadsheetApp.openById(sheetid).getActiveSheet();
+    var numParams;
+    if(e && e.parameter)
+    {
+    numParams = Object.keys(e.parameter).length;
+    }
+    var num = 'Number of parameters received: ' + numParams;
+    if(numParams==4)
+    {
+      //add a row
+      var newRow=getLastEmptyRowWithinFirst50(sheet);       //new empty row
+      var rowData=[];                                       //array to store parameter values
+
+    Logger.log("before for"+e.parameter);
+    for(var param in e.parameter)
+    {
+      // Logger.log('param= ' + param);
+      var value= stripQuotes(e.parameter[param]);
+      Logger.log(param + ':' + value);
+      switch(param)
+      {
+        case 'id':
+        rowData[0]=value;
+        break;
+
+        case 'admNum':
+        rowData[1]=value;
+        break;
+
+        case 'name':
+        rowData[2]=value;
+        result='Entry done';
+        break;
+
+        case 'phone':
+        rowData[3]=value;
+        break;
+
+        default:
+        result='Unsupported Parameters';
+      }
+    }
+    Logger.log(JSON.stringify(rowData));
+    var newEntry=sheet.getRange(newRow,1,1,rowData.length);
+    newEntry.setValues([rowData]);
+    return ContentService.createTextOutput("Success");
+  }
+    else if(numParams==1){
+      //retrieve
+      for(var param in e.parameter)
+      {
+      value1= stripQuotes(e.parameter[param]);
+      Logger.log(param + ':' + value1);
+      }
+
+    var dataToAppend=[];
+    var currDate=new Date(); //get today date
+    dataToAppend[0]=currDate;
+
+    var currTime=Utilities.formatDate(currDate,"Asia/Kolkata",'HH:mm:ss');
+    dataToAppend[1]=currTime;
+    var flag=0;
+    var values = sheet.getRange("A1:D50").getValues(); // Assuming the data is in columns A to D and limited to the first 50 rows
+    for (var i = 0; i < values.length; i++) {
+
+    if (values[i][0] == value1) {
+      flag=1;
+      dataToAppend[2]=values[i][1];
+      dataToAppend[3]=values[i][2];
+      dataToAppend[4]=values[i][3];
+      break;
+    }
+  }
+
+  var firstEmptyRow1 = findFirstEmptyRowAfter50(sheet);
+  var prevData=sheet.getDataRange().getValues();
+  for(var i=50;i<prevData.length;i++)
+    {
+      Logger.log(value+"-"+prevData[i][2]);
+      // temp=new Date(prevData[i][0]);
+      result[1]=formatDateString(currDate);
+      result[2]=formatDateString(prevData[i][0]);
+      if(prevData[i][2]==dataToAppend[2] && result[1]==result[2])
+        {
+          count++;
+        }
+        if(count & 1)
+        {
+          status="OUT";
+          result[0]="You can leave";
+        }
+        else
+        {
+          status="IN";
+          result[0]="You can enter IN.";
+        }
+      }
+    dataToAppend[5]=status;
+    sheet.getRange(firstEmptyRow1, 1, 1, dataToAppend.length).setValues([dataToAppend]);
+
+    return ContentService.createTextOutput(flag);
+    }
+    else if(numParams==3)
+    {
+      var temp1=[];
+      var newRow=findFirstEmptyRowAfter50(sheet); //new empty row
+      var rowData=[]; //array to store parameter values
+
+
+      var currDate=new Date(); //get today date
+      rowData[0]=currDate;
+
+
+      var currTime=Utilities.formatDate(currDate,"Asia/Kolkata",'HH:mm:ss');
+      rowData[1]=currTime;
+      Logger.log("before for"+e.parameter);
+      for(var param in e.parameter)
+      {
+      var value= stripQuotes(e.parameter[param]);
+      Logger.log(param + ':' + value);
+      switch(param)
+      {
+        case 'admNum':
+        rowData[2]=value;
+        prevData=sheet.getDataRange().getValues();
+        result[1]=formatDateString(currDate);
+        for(var i=50;i<prevData.length;i++)
+        {
+          Logger.log(value+"-"+prevData[i][2]);
+          temp1[0]=result[1];
+          result[2]=formatDateString(prevData[i][0]);
+          temp1[1]=result[2];
+          temp1[2]=value;
+          temp1[3]=prevData[50][2];
+          if(prevData[i][2]==value && result[1]==result[2])
+          {
+            count++;
+          }
+          if(count & 1)
+          {
+            status="OUT";
+            result[0]="You can leave";
+          }
+          else
+          {
+            status="IN";
+            result[0]="You can enter IN.";
+          }
+        }
+        break;
+
+        case 'name':
+        rowData[3]=value;
+        result='Entry done';
+        break;
+
+        case 'phone':
+        rowData[4]=value;
+        break;
+
+        default:
+        result='Unsupported Parameters';
+      }
+    }
+    rowData[5]=status;
+    Logger.log(JSON.stringify(rowData));
+    var newEntry=sheet.getRange(newRow,1,1,rowData.length);
+    newEntry.setValues([rowData]);
+    return ContentService.createTextOutput(temp1);
+  }
+  
+  else if(numParams==2)
+  {
+    var students = calculateStudentAttendance();
+    var response = JSON.stringify(students);
+    return ContentService.createTextOutput(response).setMimeType(ContentService.MimeType.JSON);
+  }
+  else 
+  {
+    return ContentService.createTextOutput("...");
+  }
+  }
+}
+
+function stripQuotes( value)
+{
+  return value.replace(/^["']|['"]$/g,"");
+}
